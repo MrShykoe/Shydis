@@ -16,7 +16,7 @@ jobs:
           gradle-version: 8.9
       - name: Unzip
         run: |
-          Z=$(find . -name зип.zip -not -path "./.git/*" | head -n1)
+          Z=$(find . -name sis.zip -not -path "./.git/*" | head -n1)
           echo "Zip: $Z"
           mkdir -p /tmp/proj
           unzip -o "$Z" -d /tmp/proj
