@@ -1,34 +1,69 @@
 name: Build APK
+
 on:
   push:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
-      - name: Unzip
+
+      - name: Unzip project
         run: |
-          Z=$(find . -name iOSNotify.zip -not -path "./.git/*" | head -n1)
-          echo "Zip: $Z"
+          # Ищем zip (sis.zip в приоритете, потом Island.zip и iOSNotify.zip)
+          Z=$(find . -maxdepth 3 \( -name "sis.zip" -o -name "Island.zip" -o -name "iOSNotify.zip" \) -not -path "./.git/*" | head -n1)
+          
+          if [ -z "$Z" ]; then
+            echo "❌ Zip-файл не найден!"
+            exit 1
+          fi
+          
+          echo "✅ Найден zip: $Z"
           mkdir -p /tmp/proj
           unzip -o "$Z" -d /tmp/proj
-      - name: Build
+          
+          # Показываем, что распаковалось
+          find /tmp/proj -type f | head -20
+
+      - name: Build APK
         run: |
-          S=$(find /tmp/proj -name settings.gradle.kts | head -n1)
-          echo "Found: $S"
+          # Ищем settings.gradle.kts или settings.gradle
+          S=$(find /tmp/proj -name "settings.gradle.kts" -o -name "settings.gradle" | head -n1)
+          
+          if [ -z "$S" ]; then
+            echo "❌ settings.gradle(.kts) не найден!"
+            exit 1
+          fi
+          
+          echo "✅ Найден проект: $S"
           cd "$(dirname "$S")"
-          gradle assembleDebug
+          
+          # Делаем gradlew исполняемым (если есть)
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug --stacktrace
+          else
+            gradle assembleDebug --stacktrace
+          fi
+          
+          # Кладём готовый APK
           mkdir -p /tmp/out
-          cp app/build/outputs/apk/debug/app-debug.apk /tmp/out/
+          find . -path "*/build/outputs/apk/*/app-*.apk" -exec cp {} /tmp/out/ \;
+          
+          ls -la /tmp/out/
+
       - uses: actions/upload-artifact@v4
         with:
-          name: island-apk
-          path: /tmp/out/app-debug.apk
+          name: Island-apk
+          path: /tmp/out/*.apk
